@@ -7,11 +7,8 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static(path.join(__dirname, "public")));
-
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
+// ★ publicじゃなくて今のフォルダを使う
+app.use(express.static(__dirname));
 
 io.on("connection", (socket) => {
   console.log("ユーザー接続:", socket.id);
