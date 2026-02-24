@@ -1,0 +1,200 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>みんなでおえかき💖</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+<style>
+
+body {
+  margin: 0;
+  font-family: 'Nunito', sans-serif;
+  background: linear-gradient(135deg, #ffd6f6, #c8f7ff);
+  text-align: center;
+}
+
+h1 {
+  margin-top: 15px;
+  color: #ff4da6;
+}
+
+#controls {
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(10px);
+  padding: 15px;
+  border-radius: 20px;
+  display: inline-block;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+}
+
+input, button {
+  border: none;
+  border-radius: 20px;
+  padding: 8px 12px;
+  margin: 5px;
+  font-size: 14px;
+}
+
+input {
+  background: #fff;
+}
+
+button {
+  background: #ff80bf;
+  color: white;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+button:hover {
+  transform: scale(1.05);
+  background: #ff4da6;
+}
+
+canvas {
+  margin-top: 15px;
+  border-radius: 25px;
+  box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+  background: white;
+  touch-action: none;
+}
+
+</style>
+</head>
+<body>
+
+<h1>🎨 みんなでおえかき 💕</h1>
+
+<div id="controls">
+  名前 <input id="username" placeholder="なまえ">
+  ルーム <input id="room" placeholder="room1">
+  パス <input id="password" placeholder="password">
+  <button onclick="joinRoom()">参加</button>
+  <br>
+  色 <input type="color" id="colorPicker" value="#ff4da6">
+  <button onclick="clearCanvas()">ぜんぶけす</button>
+  <button onclick="saveImage()">ほぞん</button>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let drawing = false;
+let joined = false;
+let lastX = 0;
+let lastY = 0;
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth * 0.9;
+  canvas.height = window.innerHeight * 0.6;
+}
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+function joinRoom() {
+  const username = document.getElementById("username").value || "ななし";
+  const room = document.getElementById("room").value || "default";
+  const password = document.getElementById("password").value;
+
+  socket.emit("joinRoom", { room, username, password });
+  joined = true;
+}
+
+function drawLine(x, y, prevX, prevY, color) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 4;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(prevX, prevY);
+  ctx.lineTo(x, y);
+  ctx.stroke();
+}
+
+canvas.addEventListener("mousedown", (e) => {
+  drawing = true;
+  const rect = canvas.getBoundingClientRect();
+  lastX = e.clientX - rect.left;
+  lastY = e.clientY - rect.top;
+});
+
+canvas.addEventListener("mouseup", () => drawing = false);
+canvas.addEventListener("mouseleave", () => drawing = false);
+
+canvas.addEventListener("mousemove", (e) => {
+  if (!drawing || !joined) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const color = document.getElementById("colorPicker").value;
+
+  drawLine(x, y, lastX, lastY, color);
+  socket.emit("draw", { x, y, prevX: lastX, prevY: lastY, color });
+
+  lastX = x;
+  lastY = y;
+});
+
+// Mobile
+canvas.addEventListener("touchstart", (e) => {
+  drawing = true;
+  const rect = canvas.getBoundingClientRect();
+  const touch = e.touches[0];
+  lastX = touch.clientX - rect.left;
+  lastY = touch.clientY - rect.top;
+});
+
+canvas.addEventListener("touchend", () => drawing = false);
+
+canvas.addEventListener("touchmove", (e) => {
+  if (!drawing || !joined) return;
+  const rect = canvas.getBoundingClientRect();
+  const touch = e.touches[0];
+  const x = touch.clientX - rect.left;
+  const y = touch.clientY - rect.top;
+  const color = document.getElementById("colorPicker").value;
+
+  drawLine(x, y, lastX, lastY, color);
+  socket.emit("draw", { x, y, prevX: lastX, prevY: lastY, color });
+
+  lastX = x;
+  lastY = y;
+});
+
+socket.on("draw", (data) => {
+  drawLine(data.x, data.y, data.prevX, data.prevY, data.color);
+});
+
+socket.on("clearCanvas", () => {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+});
+
+socket.on("loadHistory", (history) => {
+  history.forEach(d => drawLine(d.x, d.y, d.prevX, d.prevY, d.color));
+});
+
+socket.on("wrongPassword", () => {
+  alert("パスワードがちがうよ 💦");
+});
+
+function clearCanvas() {
+  socket.emit("clearCanvas");
+}
+
+function saveImage() {
+  const link = document.createElement("a");
+  link.download = "oekaki.png";
+  link.href = canvas.toDataURL();
+  link.click();
+}
+</script>
+
+</body>
+</html>
