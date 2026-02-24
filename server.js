@@ -1,52 +1,24 @@
-
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
+const path = require("path");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static("public"));
+app.use(express.static(path.join(__dirname, "public")));
 
-let rooms = {};
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
 io.on("connection", (socket) => {
-
-  socket.on("joinRoom", ({ room, username, password }) => {
-
-    if (!rooms[room]) {
-      rooms[room] = { password: password || null, history: [] };
-    } else {
-      if (rooms[room].password && rooms[room].password !== password) {
-        socket.emit("wrongPassword");
-        return;
-      }
-    }
-
-    socket.join(room);
-    socket.data.username = username;
-    socket.data.room = room;
-
-    socket.emit("loadHistory", rooms[room].history);
-  });
+  console.log("ユーザー接続:", socket.id);
 
   socket.on("draw", (data) => {
-    const room = socket.data.room;
-    if (!room) return;
-
-    rooms[room].history.push(data);
-    socket.to(room).emit("draw", data);
+    socket.broadcast.emit("draw", data);
   });
-
-  socket.on("clearCanvas", () => {
-    const room = socket.data.room;
-    if (!room) return;
-
-    rooms[room].history = [];
-    io.to(room).emit("clearCanvas");
-  });
-
 });
 
 const PORT = process.env.PORT || 3000;
